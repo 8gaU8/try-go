@@ -4,7 +4,7 @@
 
 *Your experiments deserve a home.* 🏠
 
-> For everyone who constantly creates new projects for little experiments, a one-file Ruby script to quickly manage and navigate to keep them somewhat organized
+> For everyone who constantly creates new projects for little experiments, now remade in Go with Bubble Tea so it ships as a single binary.
 
 Ever find yourself with 50 directories named `test`, `test2`, `new-test`, `actually-working-test`, scattered across your filesystem? Or worse, just coding in `/tmp` and losing everything?
 
@@ -20,9 +20,16 @@ Instantly navigate through all your experiment directories with:
 - **Fuzzy search** that just works
 - **Smart sorting** - recently used stuff bubbles to the top
 - **Auto-dating** - creates directories like `2025-08-17-redis-experiment`
-- **Zero config** - just one Ruby file, no dependencies
+- **Zero config** - single Go binary for distribution
 
 ## Installation
+
+### Build single binary (Go)
+
+```bash
+go build -o try ./cmd/try
+./try --help
+```
 
 ### RubyGems (Recommended)
 
@@ -237,10 +244,10 @@ After installation, add to your shell:
   eval "(try init ~/src/tries | string collect)"
   ```
 
-## Why Ruby?
+## Why Go?
 
-- One file, no dependencies
-- Works on any system with Ruby (macOS has it built-in)
+- Single binary distribution (no runtime dependency on Ruby)
+- Bubble Tea powered TUI
 - Fast enough for thousands of directories
 - Easy to hack on
 
