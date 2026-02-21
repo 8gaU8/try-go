@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -109,5 +110,18 @@ func TestSelectorCtrlDRejectsNonYES(t *testing.T) {
 	}
 	if !m1.deleteMode {
 		t.Fatalf("expected to remain in delete mode on invalid confirmation")
+	}
+}
+
+func TestViewUsesBubblesHelpHints(t *testing.T) {
+	m := selectorModel{
+		query:    "",
+		filtered: []scoredEntry{{entry: entry{Name: "alpha", Path: "/tmp/tries/alpha"}}},
+		keys:     newSelectorKeyMap(),
+		help:     help.New(),
+	}
+	out := m.View()
+	if !strings.Contains(out, "ctrl+d") || !strings.Contains(out, "enter") {
+		t.Fatalf("expected bubbles help hints in view, got: %s", out)
 	}
 }

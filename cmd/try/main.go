@@ -13,7 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -24,6 +27,14 @@ const (
 var (
 	httpsGitURIRe = regexp.MustCompile(`^https?://([^/]+)/([^/]+)/([^/]+)$`)
 	sshGitURIRe   = regexp.MustCompile(`^git@([^:]+):([^/]+)/([^/]+)$`)
+
+	titleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	subtleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	selectStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
+	createStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	dangerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+	promptStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+	confirmStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("213")).Bold(true)
 )
 
 type entry struct {
@@ -57,8 +68,43 @@ type selectorModel struct {
 	deleteMode    bool
 	deleteConfirm string
 	deleteTarget  string
+	keys          selectorKeyMap
+	help          help.Model
 	width         int
 	height        int
+}
+
+type selectorKeyMap struct {
+	Up      key.Binding
+	Down    key.Binding
+	Enter   key.Binding
+	Delete  key.Binding
+	Back    key.Binding
+	Confirm key.Binding
+	Cancel  key.Binding
+}
+
+func (k selectorKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Delete, k.Cancel}
+}
+
+func (k selectorKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.Up, k.Down, k.Enter},
+		{k.Delete, k.Back, k.Confirm, k.Cancel},
+	}
+}
+
+func newSelectorKeyMap() selectorKeyMap {
+	return selectorKeyMap{
+		Up:      key.NewBinding(key.WithKeys("up", "ctrl+p"), key.WithHelp("↑/ctrl+p", "up")),
+		Down:    key.NewBinding(key.WithKeys("down", "ctrl+n"), key.WithHelp("↓/ctrl+n", "down")),
+		Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
+		Delete:  key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "delete")),
+		Back:    key.NewBinding(key.WithKeys("backspace"), key.WithHelp("backspace", "erase")),
+		Confirm: key.NewBinding(key.WithKeys("YES"), key.WithHelp("YES", "confirm delete")),
+		Cancel:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+	}
 }
 
 func defaultTryPath() string {
@@ -493,17 +539,20 @@ func (m selectorModel) View() string {
 	var b strings.Builder
 	if m.deleteMode {
 		target := filepath.Base(m.deleteTarget)
-		b.WriteString("Delete try: " + target + "\n")
-		b.WriteString("Type YES to confirm: " + m.deleteConfirm + "\n")
-		b.WriteString("Enter to confirm • Esc to cancel")
+		b.WriteString(dangerStyle.Render("Delete try: " + target))
+		b.WriteString("\n")
+		b.WriteString(promptStyle.Render("Type YES to confirm: "))
+		b.WriteString(confirmStyle.Render(m.deleteConfirm))
+		b.WriteString("\n")
+		b.WriteString(subtleStyle.Render(m.help.View(m.keys)))
 		return b.String()
 	}
 
-	b.WriteString("try » ")
+	b.WriteString(titleStyle.Render("try » "))
 	if m.query == "" {
 		b.WriteString("\n")
 	} else {
-		b.WriteString(m.query)
+		b.WriteString(confirmStyle.Render(m.query))
 		b.WriteString("\n")
 	}
 	maxRows := len(m.filtered)
@@ -513,7 +562,7 @@ func (m selectorModel) View() string {
 	for i := 0; i < maxRows; i++ {
 		prefix := "  "
 		if i == m.cursor {
-			prefix = "→ "
+			prefix = selectStyle.Render("→ ")
 		}
 		b.WriteString(prefix)
 		b.WriteString(m.filtered[i].Name)
@@ -521,14 +570,14 @@ func (m selectorModel) View() string {
 	}
 	createPrefix := "  "
 	if m.cursor == len(m.filtered) {
-		createPrefix = "→ "
+		createPrefix = selectStyle.Render("→ ")
 	}
 	label := "+ Create new"
 	if m.query != "" {
 		label += ": " + m.query
 	}
-	b.WriteString(createPrefix + label + "\n")
-	b.WriteString("↑/↓ navigate • Enter select • Ctrl+D delete • Esc cancel")
+	b.WriteString(createPrefix + createStyle.Render(label) + "\n")
+	b.WriteString(subtleStyle.Render(m.help.View(m.keys)))
 	return b.String()
 }
 
@@ -555,7 +604,17 @@ func runSelector(basePath, initialQuery string) (selectorResult, error) {
 	if err != nil {
 		return selectorResult{}, err
 	}
-	m := selectorModel{basePath: basePath, query: initialQuery, entries: entries, width: 80, height: 24}
+	helpModel := help.New()
+	helpModel.ShowAll = false
+	m := selectorModel{
+		basePath: basePath,
+		query:    initialQuery,
+		entries:  entries,
+		width:    80,
+		height:   24,
+		keys:     newSelectorKeyMap(),
+		help:     helpModel,
+	}
 	m.refresh()
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr), tea.WithInput(os.Stdin))
 	finalModel, err := p.Run()
