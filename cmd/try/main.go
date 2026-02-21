@@ -46,15 +46,19 @@ type gitURI struct {
 }
 
 type selectorModel struct {
-	basePath  string
-	query     string
-	entries   []entry
-	filtered  []scoredEntry
-	cursor    int
-	selected  string
-	cancelled bool
-	width     int
-	height    int
+	basePath      string
+	query         string
+	entries       []entry
+	filtered      []scoredEntry
+	cursor        int
+	selected      string
+	deleted       string
+	cancelled     bool
+	deleteMode    bool
+	deleteConfirm string
+	deleteTarget  string
+	width         int
+	height        int
 }
 
 func defaultTryPath() string {
@@ -117,6 +121,17 @@ func scriptClone(path, uri string) []string {
 	return append(cmds, scriptCD(path)...)
 }
 
+func scriptDelete(path, basePath string) []string {
+	base := filepath.Base(path)
+	qBasePath := shellQuote(basePath)
+	return []string{
+		"old_pwd=$PWD",
+		"cd " + qBasePath,
+		"test -d " + shellQuote(base) + " && rm -rf " + shellQuote(base),
+		"cd \"$old_pwd\" 2>/dev/null || cd " + qBasePath,
+	}
+}
+
 func parseGitURI(uri string) (*gitURI, bool) {
 	trimmed := strings.TrimSuffix(strings.TrimSpace(uri), ".git")
 	if trimmed == "" {
@@ -172,6 +187,7 @@ Environment:
 Keyboard:
   ↑/↓, Ctrl-P/N     Navigate
   Enter              Select / Create new
+  Ctrl-D             Delete selected try (confirm with YES)
   Backspace          Delete character
   Esc                Cancel
 `, version)
@@ -391,10 +407,42 @@ func (m selectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
+		if m.deleteMode {
+			switch msg.Type {
+			case tea.KeyEsc:
+				m.deleteMode = false
+				m.deleteConfirm = ""
+				m.deleteTarget = ""
+			case tea.KeyBackspace:
+				if m.deleteConfirm != "" {
+					m.deleteConfirm = m.deleteConfirm[:len(m.deleteConfirm)-1]
+				}
+			case tea.KeyRunes:
+				for _, r := range msg.Runes {
+					if r == '\n' || r == '\r' {
+						continue
+					}
+					m.deleteConfirm += string(r)
+				}
+			case tea.KeyEnter:
+				if m.deleteConfirm == "YES" && m.deleteTarget != "" {
+					m.deleted = m.deleteTarget
+					return m, tea.Quit
+				}
+			}
+			return m, nil
+		}
+
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.cancelled = true
 			return m, tea.Quit
+		case tea.KeyCtrlD:
+			if m.cursor >= 0 && m.cursor < len(m.filtered) {
+				m.deleteMode = true
+				m.deleteConfirm = ""
+				m.deleteTarget = m.filtered[m.cursor].Path
+			}
 		case tea.KeyUp, tea.KeyCtrlP:
 			if m.cursor > 0 {
 				m.cursor--
@@ -439,6 +487,14 @@ func (m selectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m selectorModel) View() string {
 	var b strings.Builder
+	if m.deleteMode {
+		target := filepath.Base(m.deleteTarget)
+		b.WriteString("Delete try: " + target + "\n")
+		b.WriteString("Type YES to confirm: " + m.deleteConfirm + "\n")
+		b.WriteString("Enter confirm • Esc cancel")
+		return b.String()
+	}
+
 	b.WriteString("try » ")
 	if m.query == "" {
 		b.WriteString("\n")
@@ -468,7 +524,7 @@ func (m selectorModel) View() string {
 		label += ": " + m.query
 	}
 	b.WriteString(createPrefix + label + "\n")
-	b.WriteString("↑/↓ navigate • Enter select • Esc cancel")
+	b.WriteString("↑/↓ navigate • Enter select • Ctrl+D delete • Esc cancel")
 	return b.String()
 }
 
@@ -484,23 +540,26 @@ func uniquePath(path string) string {
 	}
 }
 
-func runSelector(basePath, initialQuery string) (string, bool, error) {
+type selectorResult struct {
+	selected  string
+	deleted   string
+	cancelled bool
+}
+
+func runSelector(basePath, initialQuery string) (selectorResult, error) {
 	entries, err := listEntries(basePath)
 	if err != nil {
-		return "", false, err
+		return selectorResult{}, err
 	}
 	m := selectorModel{basePath: basePath, query: initialQuery, entries: entries, width: 80, height: 24}
 	m.refresh()
 	p := tea.NewProgram(m, tea.WithOutput(os.Stderr), tea.WithInput(os.Stdin))
 	finalModel, err := p.Run()
 	if err != nil {
-		return "", false, err
+		return selectorResult{}, err
 	}
 	fin := finalModel.(selectorModel)
-	if fin.cancelled || fin.selected == "" {
-		return "", true, nil
-	}
-	return fin.selected, false, nil
+	return selectorResult{selected: fin.selected, deleted: fin.deleted, cancelled: fin.cancelled}, nil
 }
 
 func cmdCD(args []string, triesPath string) ([]string, bool, error) {
@@ -518,14 +577,17 @@ func cmdCD(args []string, triesPath string) ([]string, bool, error) {
 		}
 		return scriptClone(filepath.Join(triesPath, dirName), uri), false, nil
 	}
-	selected, cancelled, err := runSelector(triesPath, searchTerm)
+	result, err := runSelector(triesPath, searchTerm)
 	if err != nil {
 		return nil, false, err
 	}
-	if cancelled {
+	if result.cancelled || (result.selected == "" && result.deleted == "") {
 		return nil, true, nil
 	}
-	return scriptCD(selected), false, nil
+	if result.deleted != "" {
+		return scriptDelete(result.deleted, triesPath), false, nil
+	}
+	return scriptCD(result.selected), false, nil
 }
 
 func run(argv []string, stdout, stderr io.Writer) int {
