@@ -418,12 +418,16 @@ func (m selectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.deleteConfirm = m.deleteConfirm[:len(m.deleteConfirm)-1]
 				}
 			case tea.KeyRunes:
+				var b strings.Builder
+				b.Grow(len(m.deleteConfirm) + len(msg.Runes))
+				b.WriteString(m.deleteConfirm)
 				for _, r := range msg.Runes {
 					if r == '\n' || r == '\r' {
 						continue
 					}
-					m.deleteConfirm += string(r)
+					b.WriteRune(r)
 				}
+				m.deleteConfirm = b.String()
 			case tea.KeyEnter:
 				if m.deleteConfirm == "YES" && m.deleteTarget != "" {
 					m.deleted = m.deleteTarget
@@ -491,7 +495,7 @@ func (m selectorModel) View() string {
 		target := filepath.Base(m.deleteTarget)
 		b.WriteString("Delete try: " + target + "\n")
 		b.WriteString("Type YES to confirm: " + m.deleteConfirm + "\n")
-		b.WriteString("Enter confirm • Esc cancel")
+		b.WriteString("Enter to confirm • Esc to cancel")
 		return b.String()
 	}
 

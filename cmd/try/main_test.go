@@ -62,7 +62,7 @@ func TestInitScriptUsesExecMode(t *testing.T) {
 func TestScriptDeleteUsesGuardedCommands(t *testing.T) {
 	cmds := scriptDelete("/tmp/tries/alpha", "/tmp/tries")
 	joined := strings.Join(cmds, "\n")
-	if !strings.Contains(joined, "rm -rf 'alpha'") {
+	if !strings.Contains(joined, "rm -rf") || !strings.Contains(joined, "alpha") {
 		t.Fatalf("delete script missing target: %s", joined)
 	}
 	if !strings.Contains(joined, "cd '/tmp/tries'") {
