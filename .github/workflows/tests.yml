@@ -7,16 +7,19 @@ on:
     branches: [ "**" ]
 
 jobs:
-  ruby-tests:
+  go-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          ruby-version: '3.3'
+          go-version-file: go.mod
 
       - name: Run tests
-        run: rake
+        run: go test ./...
+
+      - name: Build
+        run: go build ./cmd/try

@@ -1,6 +1,6 @@
 # try - fresh directories for every vibe
 
-**[Website](https://pages.tobi.lutke.com/try/)** · **[RubyGems](https://rubygems.org/gems/try-cli)** · **[GitHub](https://github.com/tobi/try)**
+**[Website](https://pages.tobi.lutke.com/try/)** · **[GitHub](https://github.com/tobi/try)**
 
 *Your experiments deserve a home.* 🏠
 
@@ -31,12 +31,6 @@ go build -o try ./cmd/try
 ./try --help
 ```
 
-### RubyGems (Recommended)
-
-```bash
-gem install try-cli
-```
-
 Then add to your shell:
 
 ```bash
@@ -45,21 +39,6 @@ eval "$(try init)"
 
 # Fish - add to config.fish
 eval (try init | string collect)
-```
-
-### Quick Start (Manual)
-
-```bash
-curl -sL https://raw.githubusercontent.com/tobi/try/refs/heads/main/try.rb > ~/.local/try.rb
-
-# Make "try" executable so it can be run directly
-chmod +x ~/.local/try.rb
-
-# Add to your shell (bash/zsh)
-echo 'eval "$(ruby ~/.local/try.rb init ~/src/tries)"' >> ~/.zshrc
-
-# for fish shell users
-echo 'eval (~/.local/try.rb init ~/src/tries | string collect)' >> ~/.config/fish/config.fish
 ```
 
 ## The Problem
@@ -111,17 +90,17 @@ Not just substring matching - it's smart:
 
   ```bash
   # default is ~/src/tries
-  eval "$(~/.local/try.rb init)"
+  eval "$(try init)"
   # or pick a path
-  eval "$(~/.local/try.rb init ~/src/tries)"
+  eval "$(try init ~/src/tries)"
   ```
 
 - Fish:
 
   ```fish
-  eval (~/.local/try.rb init | string collect)
+  eval (try init | string collect)
   # or pick a path
-  eval (~/.local/try.rb init ~/src/tries | string collect)
+  eval (try init ~/src/tries | string collect)
   ```
 
 Notes:
