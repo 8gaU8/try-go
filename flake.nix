@@ -24,15 +24,7 @@
                 type = types.package;
                 default = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
                 defaultText = literalExpression "inputs.self.packages.\${pkgs.stdenv.hostPlatform.system}.default";
-                description = ''
-                  The try package to use. Can be overridden to customize Ruby version:
-                  
-                  ```nix
-                  programs.try.package = inputs.try.packages.${"$"}{pkgs.stdenv.hostPlatform.system}.default.override {
-                    ruby = pkgs.ruby_3_3;
-                  };
-                  ```
-                '';
+                description = "The try package to use.";
               };
 
               path = mkOption {
@@ -64,21 +56,18 @@
       };
 
       perSystem = { config, self', inputs', pkgs, system, ... }: {
-        packages.default = pkgs.callPackage ({ ruby ? pkgs.ruby_3_3 }: pkgs.stdenv.mkDerivation rec {
+        packages.default = pkgs.stdenv.mkDerivation rec {
           pname = "try";
           version = builtins.replaceStrings ["\n"] [""] (builtins.readFile ./VERSION);
 
           src = inputs.self;
-          nativeBuildInputs = [ pkgs.makeBinaryWrapper ];
+          nativeBuildInputs = [ pkgs.go ];
 
           installPhase = ''
             mkdir -p $out/bin
-            cp try.rb $out/bin/try
-            cp -r lib $out/bin/
-            chmod +x $out/bin/try
-
-            wrapProgram $out/bin/try \
-              --prefix PATH : ${ruby}/bin
+            export GOCACHE=$(mktemp -d)
+            export GOPATH=$(mktemp -d)
+            go build -o $out/bin/try ./cmd/try
           '';
 
           meta = with pkgs.lib; {
@@ -88,7 +77,7 @@
             maintainers = [ ];
             platforms = platforms.unix;
           };
-        }) {};
+        };
 
         apps.default = {
           type = "app";

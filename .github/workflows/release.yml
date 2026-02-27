@@ -9,24 +9,26 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          ruby-version: '3.3'
+          go-version-file: go.mod
 
       - name: Run tests
-        run: rake
+        run: go test ./...
 
-      - name: Build gem
-        run: gem build try-cli.gemspec
-
-      - name: Push to RubyGems
+      - name: Build release binary
         run: |
-          mkdir -p ~/.gem
-          echo -e "---\n:rubygems_api_key: ${{ secrets.RUBYGEMS_API_KEY }}" > ~/.gem/credentials
-          chmod 0600 ~/.gem/credentials
-          gem push try-cli-*.gem
+          GOOS=linux GOARCH=amd64 go build -o try-linux-amd64 ./cmd/try
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            try-linux-amd64
