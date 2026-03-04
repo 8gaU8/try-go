@@ -1,0 +1,6 @@
+[tools]
+go = "latest"
+
+[tasks.ci]
+description = "Run the CI pipeline"
+run = "act --workflows '.github/workflows/build.yaml' -P macos-latest=-self-hosted"
